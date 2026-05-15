@@ -593,7 +593,9 @@ export async function scrapeSephoraProduct(url: string): Promise<ScrapedProduct>
   let lastError: Error = new Error("Unknown scrape failure");
   // ── HTTP-first: try plain fetch before launching browser ──────────────────
   try {
-    const httpRes = await fetch(url, {
+    const _key = process.env.SCRAPERAPI_KEY;
+    const _fetchUrl = _key ? `https://api.scraperapi.com/?api_key=${_key}&url=${encodeURIComponent(url)}` : url;
+    const httpRes = await fetch(_fetchUrl, {
       signal: AbortSignal.timeout(12000),
       headers: {
         "User-Agent": randomUA(),

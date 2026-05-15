@@ -9,7 +9,7 @@ RUN npm ci
 COPY tsconfig.json ./
 COPY src ./src
 
-RUN npm run build
+RUN npm run build && cp -r src/db/migrations dist/db/migrations
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
 # Use the official Playwright image which already has Chromium + system deps

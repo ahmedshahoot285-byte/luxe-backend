@@ -591,7 +591,48 @@ export async function scrapeSephoraProduct(url: string): Promise<ScrapedProduct>
   validateSephoraUrl(url);
 
   let lastError: Error = new Error("Unknown scrape failure");
-
+  // ── HTTP-first: try plain fetch before launching browser ──────────────────
+  try {
+    const httpRes = await fetch(url, {
+      signal: AbortSignal.timeout(12000),
+      headers: {
+        "User-Agent": randomUA(),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.7",
+        "Cache-Control": "no-cache",
+        "Upgrade-Insecure-Requests": "1",
+      },
+    });
+    if (httpRes.ok) {
+      const html = await httpRes.text();
+      const clean = html.toLowerCase();
+      const isOk = html.length > 5000 && !BLOCK_KEYWORDS.some(kw => clean.includes(kw));
+      if (isOk) {
+        const m = html.match(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/i);
+        if (m) {
+          const ld = JSON.parse(m[1]);
+          const p: Record<string, unknown> = ld["@type"] === "Product" ? ld :
+            (Array.isArray(ld) ? ld.find((d: Record<string, unknown>) => d["@type"] === "Product") : null) ?? {};
+          if (p.name) {
+            const offers = (p.offers as Record<string, unknown>) || {};
+            const imgs: string[] = Array.isArray(p.image) ? p.image as string[] : p.image ? [p.image as string] : [];
+            console.log(`[HTTP] Scraped via HTTP: ${String(p.name)}`);
+            return {
+              name: String(p.name),
+              brand: String((p.brand as Record<string, unknown>)?.name ?? ""),
+              description: String(p.description ?? ""),
+              price_try: parseFloat(String(offers.price ?? offers.lowPrice ?? "0")),
+              sku: p.sku ? String(p.sku) : undefined,
+              images: imgs.filter((i: string) => i.startsWith("http")),
+              stock_status: String(offers.availability ?? "").includes("InStock") ? "in_stock" : "out_of_stock",
+              variants: [],
+              original_url: url,
+            };
+          }
+        }
+      }
+    }
+  } catch { /* fall through to Playwright */ }
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     const b   = await getBrowser();
     const ctx = await newStealthContext(b);

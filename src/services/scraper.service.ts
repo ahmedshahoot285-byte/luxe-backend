@@ -596,7 +596,7 @@ export async function scrapeSephoraProduct(url: string): Promise<ScrapedProduct>
     const _key = process.env.SCRAPERAPI_KEY;
     const _fetchUrl = _key ? `https://api.scraperapi.com/?api_key=${_key}&url=${encodeURIComponent(url)}` : url;
     const httpRes = await fetch(_fetchUrl, {
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(30000)
       headers: {
         "User-Agent": randomUA(),
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",

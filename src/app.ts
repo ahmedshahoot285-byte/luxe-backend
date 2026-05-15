@@ -36,7 +36,7 @@ app.use(cors({
 // ── Rate limiting ──────────────────────────────────────────────────────────
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,  // 15 minutes
-  max: 200,
+  max: 2000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: "Too many requests, slow down." },

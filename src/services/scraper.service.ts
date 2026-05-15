@@ -9,7 +9,11 @@
  * Catalog scraper handles pagination and bulk URL extraction.
  */
 
-import { chromium, Browser, BrowserContext, Page } from "playwright";
+import { Browser, BrowserContext, Page } from "playwright";
+import { chromium } from "playwright-extra";
+// @ts-ignore
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
+chromium.use(StealthPlugin());
 import { AppError } from "../utils/errors";
 
 // ── Public types ───────────────────────────────────────────────────────────

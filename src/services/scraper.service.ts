@@ -10,7 +10,7 @@
  */
 
 import { chromium, Browser, BrowserContext, Page } from "playwright";
-
+import { AppError } from "../utils/errors";
 // ── Public types ───────────────────────────────────────────────────────────
 
 export interface ScrapedVariant {

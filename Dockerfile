@@ -16,6 +16,7 @@ RUN npm run build && cp -r src/db/migrations dist/db/migrations
 FROM mcr.microsoft.com/playwright:v1.44.0-jammy AS runner
 
 WORKDIR /app
+
 # Only install production deps in the final image
 COPY package*.json ./
 
@@ -27,6 +28,7 @@ RUN npm ci --omit=dev && npx playwright install chromium
 
 # Copy compiled output
 COPY --from=builder /app/dist ./dist
+
 # The app writes backup files here; mount a volume in Railway if you want persistence
 RUN mkdir -p /app/backups
 

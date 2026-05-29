@@ -107,7 +107,26 @@ export async function createProduct(
   next: NextFunction
 ): Promise<void> {
   try {
-    const product = await ProductModel.create(req.body);
+    const body = { ...req.body };
+
+    // If brand_name is provided instead of brand_id, resolve / create the brand
+    if (body.brand_name && !body.brand_id) {
+      const slug = body.brand_name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      const brandRes = await db.query<{ id: string }>(
+        `INSERT INTO brands (name, slug)
+         VALUES ($1, $2)
+         ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+         RETURNING id`,
+        [body.brand_name.trim(), slug]
+      );
+      body.brand_id = brandRes.rows[0]?.id ?? null;
+    }
+    delete body.brand_name;
+
+    const product = await ProductModel.create(body);
     res.status(201).json({
       success: true,
       message: "Product created",

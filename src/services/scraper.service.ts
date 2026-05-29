@@ -11,6 +11,7 @@
 
 import { chromium, Browser, BrowserContext, Page } from "playwright";
 import { AppError } from "../utils/errors";
+
 // ── Public types ───────────────────────────────────────────────────────────
 
 export interface ScrapedVariant {
@@ -590,13 +591,14 @@ const MAX_RETRIES = 3;
 export async function scrapeSephoraProduct(url: string): Promise<ScrapedProduct> {
   validateSephoraUrl(url);
 
-  let lastError: Error = new Error("Unknown scrape failure");
   // ── HTTP-first: try plain fetch before launching browser ──────────────────
   try {
     const _key = process.env.SCRAPERAPI_KEY;
-    const _fetchUrl = _key ? `https://api.scraperapi.com/?api_key=${_key}&url=${encodeURIComponent(url)}&render=true` : url;
+    const _fetchUrl = _key
+      ? `https://api.scraperapi.com/?api_key=${_key}&url=${encodeURIComponent(url)}&render=true`
+      : url;
     const httpRes = await fetch(_fetchUrl, {
-     signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(60000),
       headers: {
         "User-Agent": randomUA(),
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -612,29 +614,34 @@ export async function scrapeSephoraProduct(url: string): Promise<ScrapedProduct>
       if (isOk) {
         const m = html.match(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/i);
         if (m) {
-          const ld = JSON.parse(m[1]);
-          const p: Record<string, unknown> = ld["@type"] === "Product" ? ld :
-            (Array.isArray(ld) ? ld.find((d: Record<string, unknown>) => d["@type"] === "Product") : null) ?? {};
-          if (p.name) {
-            const offers = (p.offers as Record<string, unknown>) || {};
-            const imgs: string[] = Array.isArray(p.image) ? p.image as string[] : p.image ? [p.image as string] : [];
-            console.log(`[HTTP] Scraped via HTTP: ${String(p.name)}`);
-            return {
-              name: String(p.name),
-              brand: String((p.brand as Record<string, unknown>)?.name ?? ""),
-              description: String(p.description ?? ""),
-              price_try: parseFloat(String(offers.price ?? offers.lowPrice ?? "0")),
-              sku: p.sku ? String(p.sku) : undefined,
-              images: imgs.filter((i: string) => i.startsWith("http")),
-              stock_status: String(offers.availability ?? "").includes("InStock") ? "in_stock" : "out_of_stock",
-              variants: [],
-              original_url: url,
-            };
-          }
+          try {
+            const ld = JSON.parse(m[1]);
+            const p: Record<string, unknown> = ld["@type"] === "Product" ? ld :
+              (Array.isArray(ld) ? ld.find((d: Record<string, unknown>) => d["@type"] === "Product") : null) ?? {};
+            if (p.name) {
+              const offers = (p.offers as Record<string, unknown>) || {};
+              const imgs: string[] = Array.isArray(p.image) ? p.image as string[] : p.image ? [p.image as string] : [];
+              console.log(`[HTTP] Scraped via HTTP${_key ? "+ScraperAPI" : ""}: ${String(p.name)}`);
+              return {
+                name: String(p.name),
+                brand: String((p.brand as Record<string, unknown>)?.name ?? ""),
+                description: String(p.description ?? ""),
+                price_try: parseFloat(String(offers.price ?? (offers as Record<string, unknown>).lowPrice ?? "0")),
+                sku: p.sku ? String(p.sku) : undefined,
+                images: imgs.filter((i: string) => i.startsWith("http")),
+                stock_status: String(offers.availability ?? "").includes("InStock") ? "in_stock" : "out_of_stock",
+                variants: [],
+                original_url: url,
+              };
+            }
+          } catch { /* JSON parse failed, fall through */ }
         }
       }
     }
   } catch { /* fall through to Playwright */ }
+
+  let lastError: Error = new Error("Unknown scrape failure");
+
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     const b   = await getBrowser();
     const ctx = await newStealthContext(b);
